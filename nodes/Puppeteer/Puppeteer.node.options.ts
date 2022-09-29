@@ -405,7 +405,8 @@ const stepTypes: INodeProperties = {
 	typeOptions: {
 		multipleValues: false,
 	},
-	description: "You can specify an output on the current step. Don't add more than one output per step",
+	description:
+		"You can specify an output on the current step. Don't add more than one output per step",
 	default: {},
 	options: [
 		{
@@ -419,6 +420,15 @@ const stepTypes: INodeProperties = {
 					name: "cssSelector",
 					type: "string",
 					default: "",
+				},
+				{
+					displayName: "Select All",
+					name: "selectAll",
+					type: "boolean",
+					required: false,
+					default: false,
+					description:
+						"Instead of grabbing the first element matching the CSS selector, all matching elements will be returned",
 				},
 				{
 					displayName: "innerHTML",
@@ -436,6 +446,14 @@ const stepTypes: INodeProperties = {
 					required: false,
 					default: false,
 					description: "Convert HTML nodes to JSON",
+				},
+				{
+					displayName: "No attributes",
+					name: "noAttributes",
+					type: "boolean",
+					required: false,
+					default: false,
+					description: "Ignore HTML attributes while converting to JSON",
 				},
 			],
 		},

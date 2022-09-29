@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-puppeteer-extended",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "n8n node for requesting webpages using Puppeteer",
     "license": "MIT",
     "homepage": "https://github.com/hckdotng/n8n-nodes-puppeteer-extended",

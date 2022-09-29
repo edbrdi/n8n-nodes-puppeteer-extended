@@ -108,6 +108,7 @@ Check out [this gist](https://gist.github.com/hckdotng/4232ceaaab6a3533aaca022cc
     * **Output**: Output is optional, but if you decide to output data in the current step, you can't select multiple data output even if the UI of n8n allows it. If you need multiple output just add another step without URL to stay on the same page.
         * **Page content**: Returns raw HTML (string) or JSON depending on the options selected and the context.
           * **CSS selector**: If empty it will returns the whole page (document), if not the specified element.
+          * **Select All**: Instead of grabbing the first element matching the CSS selector, all matching elements will be returned.
           * **innerHTML**: In case of CSS selector (and HTML to JSON set to false), it will returns the raw innerHTML instead of the outerHTML.
           * **HTML to JSON**: Try to convert HTML nodes to JSON with the following logic:
                 
@@ -146,6 +147,8 @@ Check out [this gist](https://gist.github.com/hckdotng/4232ceaaab6a3533aaca022cc
                     }
                 }
 
+          * **No attributes**: Ignore HTML attributes while converting to JSON.
+  
         * **Screenshot**: Returns binary.
             * **CSS selector**: If empty it captures the whole window or page depending on the options, if not it captures the corresponding zone.
             * **Property Name**: Name of the binary property returned.
@@ -187,6 +190,8 @@ Check out [this gist](https://gist.github.com/hckdotng/4232ceaaab6a3533aaca022cc
 ## License
 
 MIT License
+
+Copyright (c) 2022 Nicholas Penree <nick@penree.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

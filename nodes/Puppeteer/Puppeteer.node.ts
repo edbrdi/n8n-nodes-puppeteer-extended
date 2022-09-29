@@ -41,6 +41,8 @@ async function pageContent(
 		cssSelector: string;
 		htmlToJson: boolean;
 		innerHtml: boolean;
+		selectAll: boolean;
+		noAttributes: boolean;
 	},
 	page: Page
 ) {
@@ -48,6 +50,8 @@ async function pageContent(
 		cssSelector,
 		htmlToJson: hasHtmlToJson,
 		innerHtml: hasInnerHtml,
+		selectAll: hasSelectAll,
+		noAttributes: hasNoAttributes,
 	} = getPageContent;
 
 	return await new Promise(async (resolve, reject) => {
@@ -55,98 +59,153 @@ async function pageContent(
 
 		if (hasHtmlToJson) {
 			res = await page
-				.evaluate((cssSelector: string) => {
-					function htmlToJson(element: any) {
-						if (element.nodeType === 1 || element.nodeType === 9) {
-							const attributes: any = {};
-							if (element.attributes) {
-								for (let j = 0; j < element.attributes.length; j++) {
-									attributes["@" + element.attributes[j].nodeName] =
-										element.attributes[j].nodeValue;
-								}
-							}
-
-							let value: any;
-
-							if (
-								element.childNodes.length === 1 &&
-								element.childNodes[0].nodeName === "#text"
-							) {
-								value = element.childNodes[0].textContent;
-								if (!Object.keys(attributes).length) return value;
-							} else {
-								value = {};
-								for (let j = 0; j < element.childNodes.length; j++) {
-									const childNode = element.childNodes[j];
-									const nodeName = childNode.nodeName.toLowerCase();
-
-									if (!value[nodeName]) value[nodeName] = childNode;
-									else if (Array.isArray(value[nodeName]))
-										value[nodeName].push(childNode);
-									else value[nodeName] = [value[nodeName], childNode];
-								}
-							}
-
-							return {
-								...attributes,
-								...(typeof value === "object"
-									? { ...value }
-									: { "#text": value }),
-							};
+				.evaluate(
+					(
+						cssSelector: string,
+						hasSelectAll: boolean,
+						hasNoAttributes: boolean
+					) => {
+						function cleanText(text: string) {
+							const replaced = text
+								.replace(/\\n+/g, "\n")
+								.replace(/\s+/g, " ")
+								.trim();
+							if (replaced === "\n") return "";
+							return replaced;
 						}
 
-						return "";
-					}
-
-					function recursiveHtmlToJson(element: any) {
-						if (typeof element === "object") {
-							Object.keys(element).forEach((key) => {
-								if (!/@/.test(key)) {
-									if (Array.isArray(element[key])) {
-										element[key].forEach((child: any, j: number) => {
-											if (child.nodeType && child.nodeType === 1) {
-												element[key][j] = htmlToJson(child);
-												recursiveHtmlToJson(element[key][j]);
-											} else if (child.nodeType && child.nodeType === 3) {
-												element[key][j] = child.textContent;
-											}
-										});
-									} else {
-										const nodeType = element[key].nodeType;
-										if (nodeType && nodeType === 1) {
-											element[key] = htmlToJson(element[key]);
-											recursiveHtmlToJson(element[key]);
-										} else if (nodeType && nodeType === 3) {
-											element[key] = element[key].textContent;
-										}
+						function htmlToJson(element: any) {
+							if (element.nodeType === 1 || element.nodeType === 9) {
+								const attributes: any = {};
+								if (element.attributes && !hasNoAttributes) {
+									for (let j = 0; j < element.attributes.length; j++) {
+										attributes["@" + element.attributes[j].nodeName] =
+											element.attributes[j].nodeValue;
 									}
 								}
-							});
+
+								let value: any;
+
+								if (
+									element.childNodes.length === 1 &&
+									element.childNodes[0].nodeName === "#text"
+								) {
+									value = cleanText(element.childNodes[0].textContent);
+									if (!Object.keys(attributes).length) return value;
+								} else {
+									value = {};
+									for (let j = 0; j < element.childNodes.length; j++) {
+										const childNode = element.childNodes[j];
+										const nodeName = childNode.nodeName.toLowerCase();
+
+										if (!value[nodeName]) value[nodeName] = childNode;
+										else if (Array.isArray(value[nodeName]))
+											value[nodeName].push(childNode);
+										else value[nodeName] = [value[nodeName], childNode];
+									}
+								}
+
+								return {
+									...attributes,
+									...(typeof value === "object"
+										? { ...value }
+										: { "#text": cleanText(value) }),
+								};
+							}
+
+							return "";
 						}
-					}
 
-					const selected: Element | Document | null = cssSelector
-						? document.querySelector(cssSelector)
-						: document;
+						function recursiveHtmlToJson(element: any) {
+							if (typeof element === "object") {
+								Object.keys(element).forEach((key) => {
+									if (!/@/.test(key)) {
+										if (Array.isArray(element[key])) {
+											element[key].forEach((child: any, j: number) => {
+												if (child.nodeType && child.nodeType === 1) {
+													element[key][j] = htmlToJson(child);
+													recursiveHtmlToJson(element[key][j]);
+												} else if (child.nodeType && child.nodeType === 3) {
+													element[key][j] = cleanText(child.textContent);
+												}
+											});
 
-					const parsed = htmlToJson(selected);
-					recursiveHtmlToJson(parsed);
+											element[key] = element[key].filter((e: any) => {
+												if (typeof e === "string" && e) return e;
+												if (Object.keys(e).length) return e;
+											});
+											if (element[key].length === 1)
+												element[key] = element[key][0];
+											else if (!element[key].length) delete element[key];
+										} else {
+											const nodeType = element[key].nodeType;
+											if (nodeType && nodeType === 1) {
+												element[key] = htmlToJson(element[key]);
+												recursiveHtmlToJson(element[key]);
+												if (!element[key]) delete element[key];
+												if (
+													typeof element[key] === "object" &&
+													!Object.keys(element[key]).length
+												)
+													delete element[key];
+											} else if (nodeType && nodeType === 3) {
+												element[key] = cleanText(element[key].textContent);
+												if (!element[key]) delete element[key];
+											}
+										}
+									}
+								});
+							}
+						}
 
-					return parsed;
-				}, cssSelector)
+						const selection: (Element | Document | null)[] = [];
+						if (cssSelector && hasSelectAll) {
+							document
+								.querySelectorAll(cssSelector)
+								.forEach((e) => selection.push(e));
+						} else {
+							selection.push(
+								cssSelector ? document.querySelector(cssSelector) : document
+							);
+						}
+
+						const parsed: any[] = [];
+						selection.forEach((e) => {
+							const current = htmlToJson(e);
+							recursiveHtmlToJson(current);
+							parsed.push(current);
+						});
+
+						return hasSelectAll ? parsed : parsed[0];
+					},
+					cssSelector,
+					hasSelectAll,
+					hasNoAttributes
+				)
 				.catch((err: any) => reject(err));
 		} else {
 			res = cssSelector
 				? await page
 						.evaluate(
-							(cssSelector: string, hasInnerHtml: boolean) => {
-								const selected = hasInnerHtml
-									? document.querySelector(cssSelector)?.innerHTML
-									: document.querySelector(cssSelector)?.outerHTML;
-								return selected;
+							(
+								cssSelector: string,
+								hasInnerHtml: boolean,
+								hasSelectAll: boolean
+							) => {
+								if (cssSelector && hasSelectAll) {
+									const selection: string[] = [];
+									document.querySelectorAll(cssSelector).forEach((e) => {
+										selection.push(hasInnerHtml ? e.innerHTML : e.outerHTML);
+									});
+									return selection;
+								} else
+									return hasInnerHtml
+										? document.querySelector(cssSelector)?.innerHTML
+										: document.querySelector(cssSelector)?.outerHTML;
 							},
 							cssSelector,
-							hasInnerHtml
+							hasInnerHtml,
+							hasSelectAll
 						)
 						.catch((err: any) => reject(err))
 				: await page.content().catch((err: any) => reject(err));
@@ -279,12 +338,6 @@ export class Puppeteer implements INodeType {
 					url.searchParams.append(queryParameter.name, queryParameter.value);
 				}
 
-				console.log(
-					`Processing ${i + 1} of ${steps.length}: ${
-						device ? ` [${device}] ` : " "
-					}${url}`
-				);
-
 				const waitUntil = (step.stepOptions.waitUntil ||
 					globalOptions.waitUntil) as PuppeteerLifeCycleEvent;
 				const timeout = globalOptions.timeout as number;
@@ -379,7 +432,6 @@ export class Puppeteer implements INodeType {
 			// interact
 			if (step.interactions.parameter) {
 				for (const p of step.interactions.parameter) {
-					console.log("step.interactions.parameter", p);
 					if (p.value) {
 						// fill input
 						await page.waitForSelector(p.selector, {
