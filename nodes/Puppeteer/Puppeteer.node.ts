@@ -103,11 +103,14 @@ export class Puppeteer implements INodeType {
 			if (res) {
 				if (res.binary) {
 					for await (const key of Object.keys(res.binary)) {
+						const type = res.binary[key].type;
 						const binaryData = await this.helpers
 							.prepareBinaryData(
-								res.binary[key].data,
+								Buffer.from(res.binary[key].data),
 								undefined,
-								`image/${res.binary[key].type}`
+								type === "pdf"
+									? "application/pdf"
+									: `image/${res.binary[key].type}`
 							)
 							.catch((e) => console.log(e));
 						if (binaryData) res.binary[key] = binaryData;
@@ -117,23 +120,9 @@ export class Puppeteer implements INodeType {
 
 				returnData = [res];
 			}
-
-			// data = {
-			// 	binary: { [dataPropertyName]: binaryData },
-			// 	json: {
-			// 		headers,
-			// 		statusCode,
-			// 	},
-			// };
-
-			// const binaryData = await prepareBinaryData(
-			// 	screenshot,
-			// 	undefined,
-			// 	`image/${type}`
-			// );
 		}
 
-		await ipcRequest("shutdown", executionId);
+		// await ipcRequest("shutdown", executionId);
 
 		return this.prepareOutputData(returnData);
 	}

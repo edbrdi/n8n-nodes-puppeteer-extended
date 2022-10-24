@@ -2,8 +2,7 @@
 
 ## Todo
 
-- screenshot
-- pdf
+- pageContent property name
 - execution check
 - typer
 - améliorer html to json (#comment) ?

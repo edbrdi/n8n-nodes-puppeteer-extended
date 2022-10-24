@@ -405,8 +405,7 @@ const output: INodeProperties = {
 	typeOptions: {
 		multipleValues: true,
 	},
-	description:
-		"You can specify an output on the current node.",
+	description: "You can specify an output on the current node.",
 	default: {},
 	options: [
 		{
@@ -462,14 +461,6 @@ const output: INodeProperties = {
 			displayName: "Screenshot",
 			values: [
 				{
-					displayName: "CSS selector",
-					description:
-						"If a CSS selector is specified, the corresponding zone will be output.",
-					name: "cssSelector",
-					type: "string",
-					default: "",
-				},
-				{
 					displayName: "Property Name",
 					name: "dataPropertyName",
 					type: "string",
@@ -477,6 +468,14 @@ const output: INodeProperties = {
 					default: "data",
 					description:
 						"Name of the binary property in which  to store the image or PDF data.",
+				},
+				{
+					displayName: "CSS selector",
+					description:
+						"If a CSS selector is specified, the corresponding zone will be output.",
+					name: "cssSelector",
+					type: "string",
+					default: "",
 				},
 				{
 					displayName: "Type",
@@ -780,7 +779,8 @@ export const nodeDescription: INodeTypeDescription = {
 			placeholder: "Add Option",
 			default: {},
 			options: [...globalOptions],
-			description: "These options must be set on the first puppeteer node in your workflow and apply to all puppeteer nodes.",
+			description:
+				"These options must be set on the first puppeteer node in your workflow, they apply to all puppeteer nodes. Any global option set after puppeteer has been initialized will be ignored.",
 		},
 		{
 			displayName: "Node options",

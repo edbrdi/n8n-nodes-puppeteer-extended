@@ -26,16 +26,13 @@ export default function () {
 			}
 		);
 
-		ipc.server.on(
-			"shutdown",
-			async (data: { executionId: string }, socket: any) => {
-				if (state[data.executionId]?.browser) {
-					await state[data.executionId]?.browser.close();
-					ipc.server.emit(socket, "shutdown", true);
-				}
-				ipc.server.emit(socket, "shutdown", false);
+		ipc.server.on("shutdown", async (executionId, socket: any) => {
+			if (state[executionId]?.browser) {
+				await state[executionId]?.browser.close();
+				ipc.server.emit(socket, "shutdown", true);
 			}
-		);
+			ipc.server.emit(socket, "shutdown", false);
+		});
 
 		ipc.server.on(
 			"exec",

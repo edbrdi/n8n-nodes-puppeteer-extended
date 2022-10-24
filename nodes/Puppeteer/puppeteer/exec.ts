@@ -222,6 +222,59 @@ async function pageScreenshot(options: any, page: Page) {
 	return {};
 }
 
+async function pagePDF(options: any, page: Page) {
+	const dataPropertyName = options.dataPropertyName;
+	const pageRanges = options.pageRanges;
+	const displayHeaderFooter = options.displayHeaderFooter;
+	const omitBackground = options.omitBackground;
+	const printBackground = options.printBackground;
+	const landscape = options.landscape;
+	const preferCSSPageSize = options.preferCSSPageSize;
+	const scale = options.scale;
+	const margin = options.margin;
+
+	let headerTemplate;
+	let footerTemplate;
+	let height;
+	let width;
+	let format;
+
+	if (displayHeaderFooter === true) {
+		headerTemplate = options.headerTemplate;
+		footerTemplate = options.footerTemplate;
+	}
+
+	if (preferCSSPageSize !== true) {
+		height = options.height;
+		width = options.width;
+
+		if (!height || !width) {
+			format = options.format;
+		}
+	}
+
+	const pdfOptions: PDFOptions = {
+		format,
+		displayHeaderFooter,
+		omitBackground,
+		printBackground,
+		landscape,
+		headerTemplate,
+		footerTemplate,
+		preferCSSPageSize,
+		scale,
+		height,
+		width,
+		pageRanges,
+		margin,
+	};
+
+	const pdf = (await page.pdf(pdfOptions)) as Buffer;
+
+	if (pdf) return { [dataPropertyName]: { type: "pdf", data: pdf } };
+	return {};
+}
+
 const DEFAULT_USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.75 Safari/537.36";
 
@@ -476,7 +529,7 @@ export default async function (
 			}
 		} else {
 			if (nodeParameters.output.getPageContent) await getAllPageContent();
-			else if (nodeParameters.output.getScreenshot) {
+			if (nodeParameters.output.getScreenshot) {
 				const allScreenshot: any[] = [];
 
 				nodeParameters.output.getScreenshot.forEach(async (options: any) => {
@@ -496,72 +549,18 @@ export default async function (
 					}
 				});
 			}
-			// } else if (nodeParameters.output.getPDF) {
-			// 	const dataPropertyName = nodeParameters.output.getPDF.dataPropertyName;
-			// 	const pageRanges = nodeParameters.output.getPDF.pageRanges;
-			// 	const displayHeaderFooter =
-			// 		nodeParameters.output.getPDF.displayHeaderFooter;
-			// 	const omitBackground = nodeParameters.output.getPDF.omitBackground;
-			// 	const printBackground = nodeParameters.output.getPDF.printBackground;
-			// 	const landscape = nodeParameters.output.getPDF.landscape;
-			// 	const preferCSSPageSize =
-			// 		nodeParameters.output.getPDF.preferCSSPageSize;
-			// 	const scale = nodeParameters.output.getPDF.scale;
-			// 	const margin = nodeParameters.output.getPDF.margin;
-
-			// 	let headerTemplate;
-			// 	let footerTemplate;
-			// 	let height;
-			// 	let width;
-			// 	let format;
-
-			// 	if (displayHeaderFooter === true) {
-			// 		headerTemplate = nodeParameters.output.getPDF.headerTemplate;
-			// 		footerTemplate = nodeParameters.output.getPDF.footerTemplate;
-			// 	}
-
-			// 	if (preferCSSPageSize !== true) {
-			// 		height = nodeParameters.output.getPDF.height;
-			// 		width = nodeParameters.output.getPDF.width;
-
-			// 		if (!height || !width) {
-			// 			format = nodeParameters.output.getPDF.format;
-			// 		}
-			// 	}
-
-			// 	const pdfOptions: PDFOptions = {
-			// 		format,
-			// 		displayHeaderFooter,
-			// 		omitBackground,
-			// 		printBackground,
-			// 		landscape,
-			// 		headerTemplate,
-			// 		footerTemplate,
-			// 		preferCSSPageSize,
-			// 		scale,
-			// 		height,
-			// 		width,
-			// 		pageRanges,
-			// 		margin,
-			// 	};
-
-			// 	const pdf = (await page.pdf(pdfOptions)) as Buffer;
-			// 	if (pdf) {
-			// 		const binaryData = await prepareBinaryData(
-			// 			pdf,
-			// 			executionId,
-			// 			undefined,
-			// 			"application/pdf"
-			// 		);
-			// 		data = {
-			// 			binary: { [dataPropertyName]: binaryData },
-			// 			json: {
-			// 				headers,
-			// 				statusCode,
-			// 			},
-			// 		};
-			// 	}
-			// }
+			if (nodeParameters.output.getPDF) {
+				// puppeteer can't handle multiple pdfs generation at the same time
+				for await (const options of nodeParameters.output.getPDF) {
+					const pdfBinary = await pagePDF(options, page);
+					if (pdfBinary) {
+						data.binary = {
+							...(data.binary ?? {}),
+							...pdfBinary,
+						};
+					}
+				}
+			}
 		}
 
 		return data;
