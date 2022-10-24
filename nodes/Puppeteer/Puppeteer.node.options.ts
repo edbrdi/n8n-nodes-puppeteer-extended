@@ -231,7 +231,7 @@ const globalOptions: INodeProperties[] = [
 	},
 ];
 
-const stepOptions: INodeProperties[] = [
+const nodeOptions: INodeProperties[] = [
 	{
 		displayName: "Timeout",
 		name: "timeout",
@@ -397,16 +397,16 @@ const interactions: INodeProperties = {
 	],
 };
 
-const stepTypes: INodeProperties = {
+const output: INodeProperties = {
 	displayName: "Output",
 	name: "output",
 	placeholder: "Select",
 	type: "fixedCollection",
 	typeOptions: {
-		multipleValues: false,
+		multipleValues: true,
 	},
 	description:
-		"You can specify an output on the current step. Don't add more than one output per step",
+		"You can specify an output on the current node.",
 	default: {},
 	options: [
 		{
@@ -780,48 +780,28 @@ export const nodeDescription: INodeTypeDescription = {
 			placeholder: "Add Option",
 			default: {},
 			options: [...globalOptions],
-			description: "These options apply to each step",
+			description: "These options must be set on the first puppeteer node in your workflow and apply to all puppeteer nodes.",
 		},
 		{
-			displayName: "Steps",
-			name: "steps",
-			placeholder: "Add Step",
-			type: "fixedCollection",
-			typeOptions: {
-				multipleValues: true,
-			},
-			description:
-				"You can combine multiple steps, for example click on a button, fill a form, then take a screenshot",
+			displayName: "Node options",
+			name: "nodeOptions",
+			type: "collection",
+			placeholder: "Add Option",
 			default: {},
-			options: [
-				{
-					name: "step",
-					displayName: "No output",
-					values: [
-						{
-							displayName: "URL",
-							name: "url",
-							type: "string",
-							default: "",
-							description:
-								"Leave the field empty if you want to stay on the current URL",
-						},
-						{ ...queryParameters },
-						{
-							displayName: "Options",
-							name: "stepOptions",
-							type: "collection",
-							placeholder: "Add Option",
-							default: {},
-							options: [...stepOptions],
-							description:
-								"These options override any corresponding global options for to this step",
-						},
-						{ ...interactions },
-						{ ...stepTypes },
-					],
-				},
-			],
+			options: [...nodeOptions],
+			description:
+				"These options apply only on this node and will override any existing global option.",
 		},
+		{
+			displayName: "URL",
+			name: "url",
+			type: "string",
+			default: "",
+			description:
+				"Leave the field empty if you want to stay on the current URL",
+		},
+		{ ...queryParameters },
+		{ ...interactions },
+		{ ...output },
 	],
 };

@@ -4,10 +4,11 @@ import {
 	devices,
 	HTTPResponse,
 	ScreenshotOptions,
+	PDFOptions,
 } from "puppeteer";
-import { IDataObject, IBinaryData, INodePropertyOptions } from "n8n-workflow";
+import { IDataObject, IBinaryData } from "n8n-workflow";
 import state from "./state";
-import { Step } from "./helpers";
+import { INodeParameters } from "./helpers";
 
 async function pageContent(
 	getPageContent: {
@@ -188,48 +189,72 @@ async function pageContent(
 	});
 }
 
+async function pageScreenshot(options: any, page: Page) {
+	const type = options.imageType;
+	const fullPage = options.fullPage;
+	const cssSelector = options.cssSelector;
+	const screenshotOptions: ScreenshotOptions = {
+		type,
+		fullPage,
+	};
+
+	if (type !== "png") {
+		const quality = options.quality;
+		screenshotOptions.quality = quality;
+	}
+
+	let screenshot;
+	if (cssSelector) {
+		await page.waitForSelector(cssSelector);
+		const element = await page.$(cssSelector);
+		if (element) {
+			screenshot = (await element.screenshot({
+				...screenshotOptions,
+				fullPage: false,
+			})) as Buffer;
+		}
+	} else {
+		screenshot = (await page.screenshot(screenshotOptions)) as Buffer;
+	}
+
+	if (screenshot)
+		return { [options.dataPropertyName]: { type, data: screenshot } };
+	return {};
+}
+
 const DEFAULT_USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.75 Safari/537.36";
 
 export default async function (
-	globalOptions: IDataObject,
+	nodeParameters: INodeParameters,
 	executionId: string,
-	continueOnFail: boolean,
-	steps: any
+	continueOnFail: boolean
 ) {
-	const browser = state.browser[executionId];
+	const browser = state[executionId].browser;
 	if (!browser) return;
 
-	const returnData: INodePropertyOptions[] = [];
-	let i = 0;
-	const pageCaching = globalOptions.pageCaching !== false;
+	const pageCaching = nodeParameters.globalOptions.pageCaching !== false;
 
-	const runStep = async (
-		step: Step,
-		previousPage?: Page,
-		previousResponse?: any
-	) => {
-		if (i === 0 && !step.url) return; // cannot start with an empty url
-
-		const urlString = step.url;
+	const run = async (nodeParameters: INodeParameters) => {
+		const urlString = nodeParameters.url;
 
 		let page: Page, response;
 
 		if (urlString) {
-			const { parameter: someHeaders = [] } = (globalOptions.headers ||
-				{}) as any;
-			const queryParameters = step.queryParameters?.parameter ?? [];
+			const { parameter: someHeaders = [] } = (nodeParameters.globalOptions
+				.headers || {}) as any;
+			const queryParameters = nodeParameters.queryParameters?.parameter ?? [];
 			const requestHeaders = someHeaders.reduce((acc: any, cur: any) => {
 				acc[cur.name] = cur.value;
 				return acc;
 			}, {});
-			const device = globalOptions.device as string;
+			const device = nodeParameters.globalOptions.device as string;
 
 			const url = new URL(urlString);
 			page = await browser.newPage();
 
-			if (globalOptions.viewport) {
-				const viewport = globalOptions.viewport as {
+			if (nodeParameters.globalOptions.viewport) {
+				const viewport = nodeParameters.globalOptions.viewport as {
 					size: { width: number; height: number };
 				};
 				const { width, height } = viewport.size;
@@ -257,42 +282,62 @@ export default async function (
 				url.searchParams.append(queryParameter.name, queryParameter.value);
 			}
 
-			const waitUntil = (step.stepOptions.waitUntil ||
-				globalOptions.waitUntil) as PuppeteerLifeCycleEvent;
-			const timeout = globalOptions.timeout as number;
+			const waitUntil = (nodeParameters.nodeOptions.waitUntil ||
+				nodeParameters.globalOptions.waitUntil) as PuppeteerLifeCycleEvent;
+			const timeout = nodeParameters.globalOptions.timeout as number;
 			response = await page.goto(url.toString(), { waitUntil, timeout });
-		} else {
-			page = previousPage as Page;
-			response = previousResponse;
 
-			if (step.stepOptions.waitUntil)
+			state[executionId].previousPage = page;
+			state[executionId].previousResponse = response;
+		} else if (
+			state[executionId].previousPage &&
+			state[executionId].previousResponse
+		) {
+			page = state[executionId].previousPage as Page;
+			response = state[executionId].previousResponse;
+
+			if (nodeParameters.nodeOptions.waitUntil)
 				await page.waitForNavigation({
-					waitUntil: step.stepOptions.waitUntil,
+					waitUntil: nodeParameters.nodeOptions.waitUntil,
 				});
+		} else {
+			throw new Error("No previous page or response found");
 		}
 
 		// time to wait
-		if (step.stepOptions.timeToWait || globalOptions.timeToWait)
+		if (
+			nodeParameters.nodeOptions.timeToWait ||
+			nodeParameters.globalOptions.timeToWait
+		)
 			await page.waitForTimeout(
-				step.stepOptions.timeToWait ?? globalOptions.timeToWait
+				nodeParameters.nodeOptions.timeToWait ??
+					nodeParameters.globalOptions.timeToWait
 			);
 
 		// wait for selector
-		if (step.stepOptions.waitForSelector || globalOptions.waitForSelector)
+		if (
+			nodeParameters.nodeOptions.waitForSelector ||
+			nodeParameters.globalOptions.waitForSelector
+		)
 			await page.waitForSelector(
-				step.stepOptions.waitForSelector ?? globalOptions.waitForSelector,
+				nodeParameters.nodeOptions.waitForSelector ??
+					nodeParameters.globalOptions.waitForSelector,
 				{ timeout: 10000 }
 			);
 
 		// inject html
-		if (step.stepOptions.injectHtml || globalOptions.injectHtml) {
+		if (
+			nodeParameters.nodeOptions.injectHtml ||
+			nodeParameters.globalOptions.injectHtml
+		) {
 			await page.evaluate(
-				async (step: Step, globalOptions: IDataObject) => {
+				async (nodeParameters: INodeParameters, globalOptions: IDataObject) => {
 					const img = document.createElement("img");
 					img.style.display = "none";
 					const div = document.createElement("div");
 					const content =
-						step.stepOptions.injectHtml ?? globalOptions.injectHtml;
+						nodeParameters.nodeOptions.injectHtml ??
+						nodeParameters.globalOptions.injectHtml;
 					div.innerHTML = content;
 					const promise = new Promise((resolve, reject) => {
 						img.onload = resolve;
@@ -304,17 +349,22 @@ export default async function (
 						"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgDTD2qgAAAAASUVORK5CYII=";
 					await promise;
 				},
-				step as any,
-				globalOptions as any
+				nodeParameters as any,
+				nodeParameters.globalOptions as any
 			);
 		}
 
 		// inject css
-		if (step.stepOptions.injectCss || globalOptions.injectCss) {
+		if (
+			nodeParameters.nodeOptions.injectCss ||
+			nodeParameters.globalOptions.injectCss
+		) {
 			await page.evaluate(
-				async (step: Step, globalOptions: IDataObject) => {
+				async (nodeParameters: INodeParameters, globalOptions: IDataObject) => {
 					const style = document.createElement("style");
-					const content = step.stepOptions.injectCss ?? globalOptions.injectCss;
+					const content =
+						nodeParameters.nodeOptions.injectCss ??
+						nodeParameters.globalOptions.injectCss;
 					style.appendChild(document.createTextNode(content));
 					const promise = new Promise((resolve, reject) => {
 						style.onload = resolve;
@@ -323,17 +373,22 @@ export default async function (
 					document.head.appendChild(style);
 					await promise;
 				},
-				step as any,
-				globalOptions as any
+				nodeParameters as any,
+				nodeParameters.globalOptions as any
 			);
 		}
 
 		// inject js
-		if (step.stepOptions.injectJs || globalOptions.injectJs) {
+		if (
+			nodeParameters.nodeOptions.injectJs ||
+			nodeParameters.globalOptions.injectJs
+		) {
 			await page.evaluate(
-				async (step: Step, globalOptions: IDataObject) => {
+				async (nodeParameters: INodeParameters, globalOptions: IDataObject) => {
 					const script = document.createElement("script");
-					const content = step.stepOptions.injectJs ?? globalOptions.injectJs;
+					const content =
+						nodeParameters.nodeOptions.injectJs ??
+						nodeParameters.globalOptions.injectJs;
 					script.appendChild(document.createTextNode(content));
 					const promise = new Promise((resolve, reject) => {
 						script.onload = resolve;
@@ -342,14 +397,14 @@ export default async function (
 					document.head.appendChild(script);
 					await promise;
 				},
-				step as any,
-				globalOptions as any
+				nodeParameters as any,
+				nodeParameters.globalOptions as any
 			);
 		}
 
 		// interact
-		if (step.interactions.parameter) {
-			for (const p of step.interactions.parameter) {
+		if (nodeParameters.interactions.parameter) {
+			for (const p of nodeParameters.interactions.parameter) {
 				if (p.value) {
 					// fill input
 					await page.waitForSelector(p.selector, {
@@ -383,98 +438,76 @@ export default async function (
 
 		const headers = await response.headers();
 		const statusCode = response.status();
-		let returnItem: {
+
+		let data: {
 			binary?: { [key: string]: IBinaryData };
 			json: {
-				step: number;
-				headers: object;
-				statusCode: number;
-				pageContent?: any;
+				[key: string]: any;
 			};
+		} = {
+			json: {
+				headers,
+				statusCode,
+			},
+		};
+
+		const getAllPageContent = async () => {
+			const allPageContent: any[] = [];
+
+			nodeParameters.output.getPageContent.forEach((options: any) => {
+				allPageContent.push(pageContent(options, page));
+			});
+
+			const resolvedAllPageContent = await Promise.all(allPageContent).catch(
+				(e: any) => console.log(e)
+			);
+
+			(resolvedAllPageContent ?? []).forEach((pageContent, i) => {
+				data.json[i === 0 ? "pageContent" : `pageContent-${i + 1}`] =
+					pageContent;
+			});
 		};
 
 		if (statusCode !== 200) {
 			if (continueOnFail !== true) {
-				returnItem = {
-					json: {
-						step: i + 1,
-						headers,
-						statusCode,
-					},
-				};
-				if (step.output.getPageContent) {
-					const content = await pageContent(step.output.getPageContent, page);
-					returnItem.json["pageContent"] = content;
-				}
+				if (nodeParameters.output.getPageContent) await getAllPageContent();
 			} else {
 				throw new Error(`Request failed with status code ${statusCode}`);
 			}
 		} else {
-			returnItem = {
-				json: {
-					step: i + 1,
-					headers,
-					statusCode,
-				},
-			};
-			if (step.output.getPageContent) {
-				const content = await pageContent(step.output.getPageContent, page);
-				returnItem.json["pageContent"] = content;
+			if (nodeParameters.output.getPageContent) await getAllPageContent();
+			else if (nodeParameters.output.getScreenshot) {
+				const allScreenshot: any[] = [];
+
+				nodeParameters.output.getScreenshot.forEach(async (options: any) => {
+					allScreenshot.push(pageScreenshot(options, page));
+				});
+
+				const resolvedAllPageScreenshot = await Promise.all(
+					allScreenshot
+				).catch((e: any) => console.log(e));
+
+				(resolvedAllPageScreenshot ?? []).forEach((pageScreenshot) => {
+					if (pageScreenshot) {
+						data.binary = {
+							...(data.binary ?? {}),
+							...pageScreenshot,
+						};
+					}
+				});
 			}
-			// } else if (step.output.getScreenshot) {
-			// 	const dataPropertyName = step.output.getScreenshot.dataPropertyName;
-			// 	const type = step.output.getScreenshot.imageType;
-			// 	const fullPage = step.output.getScreenshot.fullPage;
-			// 	const cssSelector = step.output.getScreenshot.cssSelector;
-			// 	const screenshotOptions: ScreenshotOptions = {
-			// 		type,
-			// 		fullPage,
-			// 	};
-
-			// 	if (type !== "png") {
-			// 		const quality = step.output.getScreenshot.quality;
-			// 		screenshotOptions.quality = quality;
-			// 	}
-
-			// 	let screenshot;
-			// 	if (cssSelector) {
-			// 		await page.waitForSelector(cssSelector);
-			// 		const element = await page.$(cssSelector);
-			// 		if (element) {
-			// 			screenshot = (await element.screenshot({
-			// 				...screenshotOptions,
-			// 				fullPage: false,
-			// 			})) as Buffer;
-			// 		}
-			// 	} else {
-			// 		screenshot = (await page.screenshot(screenshotOptions)) as Buffer;
-			// 	}
-
-			// 	if (screenshot) {
-			// 		const binaryData = await this.helpers.prepareBinaryData(
-			// 			screenshot,
-			// 			undefined,
-			// 			`image/${type}`
-			// 		);
-			// 		returnItem = {
-			// 			binary: { [dataPropertyName]: binaryData },
-			// 			json: {
-			// 				step: i + 1,
-			// 				headers,
-			// 				statusCode,
-			// 			},
-			// 		};
-			// 	}
-			// } else if (step.output.getPDF) {
-			// 	const dataPropertyName = step.output.getPDF.dataPropertyName;
-			// 	const pageRanges = step.output.getPDF.pageRanges;
-			// 	const displayHeaderFooter = step.output.getPDF.displayHeaderFooter;
-			// 	const omitBackground = step.output.getPDF.omitBackground;
-			// 	const printBackground = step.output.getPDF.printBackground;
-			// 	const landscape = step.output.getPDF.landscape;
-			// 	const preferCSSPageSize = step.output.getPDF.preferCSSPageSize;
-			// 	const scale = step.output.getPDF.scale;
-			// 	const margin = step.output.getPDF.margin;
+			// } else if (nodeParameters.output.getPDF) {
+			// 	const dataPropertyName = nodeParameters.output.getPDF.dataPropertyName;
+			// 	const pageRanges = nodeParameters.output.getPDF.pageRanges;
+			// 	const displayHeaderFooter =
+			// 		nodeParameters.output.getPDF.displayHeaderFooter;
+			// 	const omitBackground = nodeParameters.output.getPDF.omitBackground;
+			// 	const printBackground = nodeParameters.output.getPDF.printBackground;
+			// 	const landscape = nodeParameters.output.getPDF.landscape;
+			// 	const preferCSSPageSize =
+			// 		nodeParameters.output.getPDF.preferCSSPageSize;
+			// 	const scale = nodeParameters.output.getPDF.scale;
+			// 	const margin = nodeParameters.output.getPDF.margin;
 
 			// 	let headerTemplate;
 			// 	let footerTemplate;
@@ -483,16 +516,16 @@ export default async function (
 			// 	let format;
 
 			// 	if (displayHeaderFooter === true) {
-			// 		headerTemplate = step.output.getPDF.headerTemplate;
-			// 		footerTemplate = step.output.getPDF.footerTemplate;
+			// 		headerTemplate = nodeParameters.output.getPDF.headerTemplate;
+			// 		footerTemplate = nodeParameters.output.getPDF.footerTemplate;
 			// 	}
 
 			// 	if (preferCSSPageSize !== true) {
-			// 		height = step.output.getPDF.height;
-			// 		width = step.output.getPDF.width;
+			// 		height = nodeParameters.output.getPDF.height;
+			// 		width = nodeParameters.output.getPDF.width;
 
 			// 		if (!height || !width) {
-			// 			format = step.output.getPDF.format;
+			// 			format = nodeParameters.output.getPDF.format;
 			// 		}
 			// 	}
 
@@ -514,15 +547,15 @@ export default async function (
 
 			// 	const pdf = (await page.pdf(pdfOptions)) as Buffer;
 			// 	if (pdf) {
-			// 		const binaryData = await this.helpers.prepareBinaryData(
+			// 		const binaryData = await prepareBinaryData(
 			// 			pdf,
+			// 			executionId,
 			// 			undefined,
 			// 			"application/pdf"
 			// 		);
-			// 		returnItem = {
+			// 		data = {
 			// 			binary: { [dataPropertyName]: binaryData },
 			// 			json: {
-			// 				step: i + 1,
 			// 				headers,
 			// 				statusCode,
 			// 			},
@@ -531,17 +564,8 @@ export default async function (
 			// }
 		}
 
-		if (!steps[i + 1] || steps[i + 1].url) await page.close();
-
-		if (returnItem) {
-			// @ts-ignore
-			returnData.push(returnItem);
-		}
-
-		i++;
-		if (steps[i]) await runStep(steps[i], page, response);
+		return data;
 	};
 
-	if (steps.length) await runStep(steps[0]);
-	return returnData;
+	return await run(nodeParameters);
 }

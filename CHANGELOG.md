@@ -1,5 +1,15 @@
 # Changelog
 
+## Todo
+
+- screenshot
+- pdf
+- execution check
+- typer
+- améliorer html to json (#comment) ?
+- catchers
+- doc
+
 ## Released (2022-09-29 0.0.2)
 
 ### New Features

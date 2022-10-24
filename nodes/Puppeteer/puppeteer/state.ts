@@ -1,11 +1,11 @@
 import { Browser } from "puppeteer";
 
 const state: {
-	browser: {
-		[key: string]: Browser;
+	[key: string]: {
+		browser: Browser;
+		previousPage?: any;
+		previousResponse?: any;
 	};
-} = {
-	browser: {},
-};
+} = {};
 
 export default state;

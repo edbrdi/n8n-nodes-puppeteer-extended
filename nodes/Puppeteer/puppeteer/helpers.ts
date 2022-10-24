@@ -1,11 +1,12 @@
 import ipc from "node-ipc";
 // import state from './state';
 
-export interface Step {
+export interface INodeParameters {
 	url: string;
 	queryParameters: { parameter: any[] };
 	output: { [key: string]: any };
-	stepOptions: { [key: string]: any };
+	globalOptions: { [key: string]: any };
+	nodeOptions: { [key: string]: any };
 	interactions: {
 		parameter: {
 			selector: string;

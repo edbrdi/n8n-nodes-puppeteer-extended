@@ -4,6 +4,7 @@ import { IDataObject } from "n8n-workflow";
 import start from "./start";
 import exec from "./exec";
 import state from "./state";
+import { INodeParameters } from "./helpers";
 
 export default function () {
 	ipc.config.id = "puppeteer";
@@ -17,19 +18,19 @@ export default function () {
 				socket: any
 			) => {
 				let browser: Browser | void;
-				if (!state.browser[data.executionId]) {
+				if (!state[data.executionId]?.browser) {
 					browser = await start(data.globalOptions);
-					if (browser) state.browser[data.executionId] = browser;
+					if (browser) state[data.executionId] = { browser };
 				}
-				ipc.server.emit(socket, "launch", !!state.browser[data.executionId]);
+				ipc.server.emit(socket, "launch", !!state[data.executionId]?.browser);
 			}
 		);
 
 		ipc.server.on(
 			"shutdown",
 			async (data: { executionId: string }, socket: any) => {
-				if (state.browser[data.executionId]) {
-					await state.browser[data.executionId].close();
+				if (state[data.executionId]?.browser) {
+					await state[data.executionId]?.browser.close();
 					ipc.server.emit(socket, "shutdown", true);
 				}
 				ipc.server.emit(socket, "shutdown", false);
@@ -40,18 +41,16 @@ export default function () {
 			"exec",
 			async (
 				data: {
-					globalOptions: IDataObject;
+					nodeParameters: INodeParameters;
 					executionId: string;
 					continueOnFail: boolean;
-					steps: any[];
 				},
 				socket: any
 			) => {
 				const returnData = await exec(
-					data.globalOptions,
+					data.nodeParameters,
 					data.executionId,
-					data.continueOnFail,
-					data.steps
+					data.continueOnFail
 				);
 
 				ipc.server.emit(socket, "exec", returnData);
