@@ -29,36 +29,3 @@ export const ipcRequest = (type: string, parameters: any): Promise<any> => {
 		});
 	});
 };
-
-// export interface IExecutionData {
-// 	executionId: string;
-// 	placeholderId: string;
-// 	channelId: string;
-// 	apiKey: string;
-// 	userId?: string;
-// }
-
-// export const execution = async (
-// 	executionId: string,
-// 	placeholderId: string,
-// 	channelId: string,
-// 	apiKey: string,
-// 	userId?: string,
-// ): Promise<boolean> => {
-// 	return new Promise((resolve, reject) => {
-// 		const timeout = setTimeout(() => reject('timeout'), 15000);
-// 		ipc.connectTo('bot', () => {
-// 			ipc.of.bot.emit('execution', {
-// 				executionId,
-// 				placeholderId,
-// 				channelId,
-// 				apiKey,
-// 				userId,
-// 			});
-// 			ipc.of.bot.on('execution', () => {
-// 				clearTimeout(timeout);
-// 				resolve(true);
-// 			});
-// 		});
-// 	});
-// };

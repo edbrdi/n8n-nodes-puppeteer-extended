@@ -413,6 +413,15 @@ const output: INodeProperties = {
 			displayName: "Page content",
 			values: [
 				{
+					displayName: "Property Name",
+					name: "dataPropertyName",
+					type: "string",
+					required: true,
+					default: "pageContent",
+					description:
+						"Name of the json key to access the page content.",
+				},
+				{
 					displayName: "CSS selector",
 					description:
 						"If a CSS selector is specified, the corresponding zone will be output",
@@ -531,7 +540,7 @@ const output: INodeProperties = {
 					name: "dataPropertyName",
 					type: "string",
 					required: true,
-					default: "data",
+					default: "page",
 					description:
 						"Name of the binary property in which  to store the image or PDF data.",
 				},
@@ -771,6 +780,12 @@ export const nodeDescription: INodeTypeDescription = {
 	icon: "file:puppeteer.svg",
 	inputs: ["main"],
 	outputs: ["main"],
+	credentials: [
+		{
+			name: "puppeteer",
+			required: true,
+		},
+	],
 	properties: [
 		{
 			displayName: "Global options",

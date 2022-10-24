@@ -12,6 +12,7 @@ import { INodeParameters } from "./helpers";
 
 async function pageContent(
 	getPageContent: {
+		dataPropertyName: string;
 		cssSelector: string;
 		htmlToJson: boolean;
 		innerHtml: boolean;
@@ -21,6 +22,7 @@ async function pageContent(
 	page: Page
 ) {
 	const {
+		dataPropertyName,
 		cssSelector,
 		htmlToJson: hasHtmlToJson,
 		innerHtml: hasInnerHtml,
@@ -29,10 +31,10 @@ async function pageContent(
 	} = getPageContent;
 
 	return await new Promise(async (resolve, reject) => {
-		let res;
+		let content;
 
 		if (hasHtmlToJson) {
-			res = await page
+			content = await page
 				.evaluate(
 					(
 						cssSelector: string,
@@ -158,7 +160,7 @@ async function pageContent(
 				)
 				.catch((err: any) => reject(err));
 		} else {
-			res = cssSelector
+			content = cssSelector
 				? await page
 						.evaluate(
 							(
@@ -185,7 +187,7 @@ async function pageContent(
 				: await page.content().catch((err: any) => reject(err));
 		}
 
-		resolve(res);
+		resolve({ content, dataPropertyName });
 	});
 }
 
@@ -283,7 +285,7 @@ export default async function (
 	executionId: string,
 	continueOnFail: boolean
 ) {
-	const browser = state[executionId].browser;
+	const browser = state.executions[executionId].browser;
 	if (!browser) return;
 
 	const pageCaching = nodeParameters.globalOptions.pageCaching !== false;
@@ -340,14 +342,14 @@ export default async function (
 			const timeout = nodeParameters.globalOptions.timeout as number;
 			response = await page.goto(url.toString(), { waitUntil, timeout });
 
-			state[executionId].previousPage = page;
-			state[executionId].previousResponse = response;
+			state.executions[executionId].previousPage = page;
+			state.executions[executionId].previousResponse = response;
 		} else if (
-			state[executionId].previousPage &&
-			state[executionId].previousResponse
+			state.executions[executionId].previousPage &&
+			state.executions[executionId].previousResponse
 		) {
-			page = state[executionId].previousPage as Page;
-			response = state[executionId].previousResponse;
+			page = state.executions[executionId].previousPage as Page;
+			response = state.executions[executionId].previousResponse;
 
 			if (nodeParameters.nodeOptions.waitUntil)
 				await page.waitForNavigation({
@@ -515,9 +517,8 @@ export default async function (
 				(e: any) => console.log(e)
 			);
 
-			(resolvedAllPageContent ?? []).forEach((pageContent, i) => {
-				data.json[i === 0 ? "pageContent" : `pageContent-${i + 1}`] =
-					pageContent;
+			(resolvedAllPageContent ?? []).forEach((pageContent) => {
+				data.json[pageContent.dataPropertyName] = pageContent.content;
 			});
 		};
 

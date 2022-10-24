@@ -1,6 +1,7 @@
 import { Browser } from "puppeteer";
 import ipc from "node-ipc";
 import { IDataObject } from "n8n-workflow";
+import axios from "axios";
 import start from "./start";
 import exec from "./exec";
 import state from "./state";
@@ -18,21 +19,17 @@ export default function () {
 				socket: any
 			) => {
 				let browser: Browser | void;
-				if (!state[data.executionId]?.browser) {
+				if (!state.executions[data.executionId]?.browser) {
 					browser = await start(data.globalOptions);
-					if (browser) state[data.executionId] = { browser };
+					if (browser) state.executions[data.executionId] = { browser };
 				}
-				ipc.server.emit(socket, "launch", !!state[data.executionId]?.browser);
+				ipc.server.emit(
+					socket,
+					"launch",
+					!!state.executions[data.executionId]?.browser
+				);
 			}
 		);
-
-		ipc.server.on("shutdown", async (executionId, socket: any) => {
-			if (state[executionId]?.browser) {
-				await state[executionId]?.browser.close();
-				ipc.server.emit(socket, "shutdown", true);
-			}
-			ipc.server.emit(socket, "shutdown", false);
-		});
 
 		ipc.server.on(
 			"exec",
@@ -51,6 +48,59 @@ export default function () {
 				);
 
 				ipc.server.emit(socket, "exec", returnData);
+			}
+		);
+
+		ipc.server.on(
+			"check",
+			async (
+				data: { executionId: string; apiKey: string; webhookHost: string },
+				socket: any
+			) => {
+				ipc.server.emit(socket, "check", true);
+				if (
+					data.executionId &&
+					data.apiKey &&
+					state.executions[data.executionId] &&
+					!state.executions[data.executionId].checked
+				) {
+					state.executions[data.executionId].checked = true;
+					const checkExecution = async (
+						executionId: string,
+						apiKey: string,
+						webhookHost: string
+					) => {
+						const headers = {
+							accept: "application/json",
+							"X-N8N-API-KEY": apiKey,
+						};
+						const res = await axios
+							.get(
+								`${
+									webhookHost ?? state.webhookHost
+								}/api/v1/executions/${executionId}`,
+								{
+									headers,
+								}
+							)
+							.catch((e) => e);
+						if (
+							res &&
+							res.data &&
+							res.data.finished === false &&
+							res.data.stoppedAt === null
+						) {
+							setTimeout(() => {
+								checkExecution(executionId, apiKey, webhookHost);
+							}, 3000);
+						} else if (state.executions[executionId]?.browser) {
+							// stop puppeteer
+							await state.executions[executionId]?.browser.close();
+							delete state.executions[executionId];
+						}
+					};
+					checkExecution(data.executionId, data.apiKey, data.webhookHost);
+				}
 			}
 		);
 	});

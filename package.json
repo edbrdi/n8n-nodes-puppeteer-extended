@@ -36,7 +36,9 @@
         "automation"
     ],
     "n8n": {
-        "credentials": [],
+        "credentials": [
+			"dist/credentials/Puppeteer.credentials.js"
+		],
         "nodes": [
             "dist/nodes/Puppeteer/Puppeteer.node.js"
         ]
