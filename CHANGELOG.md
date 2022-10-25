@@ -19,7 +19,7 @@ An API access to n8n is required to check when the workflow execution stops in o
 ### Refactors
 
 * HTML to JSON improvements
-* Due to the new architecture, the UI has been siplified
+* Due to the new architecture, the UI has been simplified
 
 ## Released (2022-09-29 0.0.2)
 
