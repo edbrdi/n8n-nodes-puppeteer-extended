@@ -42,10 +42,12 @@ export class Puppeteer implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		let returnData: INodeExecutionData[] = [];
-		const credentials = (await this.getCredentials("puppeteer")) as any; // as ICredentials;
+		const credentials = (await this.getCredentials("n8nApi")) as {
+			apiKey: string;
+			baseUrl: string;
+		};
 		// @ts-ignore
 		const executionId = this.getExecutionId();
-		const webhookHost = this.getRestApiUrl().replace("/rest", "");
 
 		const globalOptions = this.getNodeParameter(
 			"globalOptions",
@@ -124,7 +126,7 @@ export class Puppeteer implements INodeType {
 		ipcRequest("check", {
 			executionId,
 			apiKey: credentials.apiKey,
-			webhookHost,
+			baseUrl: credentials.baseUrl,
 		});
 
 		return this.prepareOutputData(returnData);

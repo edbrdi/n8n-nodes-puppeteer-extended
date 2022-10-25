@@ -1,7 +1,6 @@
 import { Browser } from "puppeteer";
 
 const state: {
-	webhookHost: string;
 	executions: {
 		[key: string]: {
 			browser: Browser;
@@ -11,8 +10,6 @@ const state: {
 		};
 	};
 } = {
-	webhookHost:
-		process.env?.WEBHOOK_URL?.replace(/\/$/, "") || "http://localhost:5678",
 	executions: {},
 };
 

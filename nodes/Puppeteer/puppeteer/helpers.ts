@@ -3,7 +3,7 @@ import ipc from "node-ipc";
 
 export interface INodeParameters {
 	url: string;
-	queryParameters: { parameter: any[] };
+	queryParameters: { parameter: { name: string; value: string }[] };
 	output: { [key: string]: any };
 	globalOptions: { [key: string]: any };
 	nodeOptions: { [key: string]: any };

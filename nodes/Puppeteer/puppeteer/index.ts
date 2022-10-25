@@ -54,7 +54,7 @@ export default function () {
 		ipc.server.on(
 			"check",
 			async (
-				data: { executionId: string; apiKey: string; webhookHost: string },
+				data: { executionId: string; apiKey: string; baseUrl: string },
 				socket: any
 			) => {
 				ipc.server.emit(socket, "check", true);
@@ -68,21 +68,16 @@ export default function () {
 					const checkExecution = async (
 						executionId: string,
 						apiKey: string,
-						webhookHost: string
+						baseUrl: string
 					) => {
 						const headers = {
 							accept: "application/json",
 							"X-N8N-API-KEY": apiKey,
 						};
 						const res = await axios
-							.get(
-								`${
-									webhookHost ?? state.webhookHost
-								}/api/v1/executions/${executionId}`,
-								{
-									headers,
-								}
-							)
+							.get(`${baseUrl}/executions/${executionId}`, {
+								headers,
+							})
 							.catch((e) => e);
 						if (
 							res &&
@@ -91,7 +86,7 @@ export default function () {
 							res.data.stoppedAt === null
 						) {
 							setTimeout(() => {
-								checkExecution(executionId, apiKey, webhookHost);
+								checkExecution(executionId, apiKey, baseUrl);
 							}, 3000);
 						} else if (state.executions[executionId]?.browser) {
 							// stop puppeteer
@@ -99,7 +94,7 @@ export default function () {
 							delete state.executions[executionId];
 						}
 					};
-					checkExecution(data.executionId, data.apiKey, data.webhookHost);
+					checkExecution(data.executionId, data.apiKey, data.baseUrl);
 				}
 			}
 		);

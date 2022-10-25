@@ -418,8 +418,7 @@ const output: INodeProperties = {
 					type: "string",
 					required: true,
 					default: "pageContent",
-					description:
-						"Name of the json key to access the page content.",
+					description: "Name of the json key to access the page content.",
 				},
 				{
 					displayName: "CSS selector",
@@ -442,6 +441,11 @@ const output: INodeProperties = {
 					displayName: "innerHTML",
 					name: "innerHtml",
 					type: "boolean",
+					displayOptions: {
+						show: {
+							htmlToJson: [false],
+						},
+					},
 					required: false,
 					default: false,
 					description:
@@ -459,6 +463,11 @@ const output: INodeProperties = {
 					displayName: "No attributes",
 					name: "noAttributes",
 					type: "boolean",
+					displayOptions: {
+						show: {
+							htmlToJson: [true],
+						},
+					},
 					required: false,
 					default: false,
 					description: "Ignore HTML attributes while converting to JSON",
@@ -515,6 +524,11 @@ const output: INodeProperties = {
 					typeOptions: {
 						minValue: 0,
 						maxValue: 100,
+					},
+					displayOptions: {
+						hide: {
+							imageType: ["png"],
+						},
 					},
 					default: 100,
 					description:
@@ -782,7 +796,7 @@ export const nodeDescription: INodeTypeDescription = {
 	outputs: ["main"],
 	credentials: [
 		{
-			name: "puppeteer",
+			name: "n8nApi",
 			required: true,
 		},
 	],
@@ -813,7 +827,7 @@ export const nodeDescription: INodeTypeDescription = {
 			type: "string",
 			default: "",
 			description:
-				"Leave the field empty if you want to stay on the current URL",
+				"Leave the field empty if you want to stay on the current URL (must be set on the first Puppeteer node).",
 		},
 		{ ...queryParameters },
 		{ ...interactions },

@@ -13,9 +13,9 @@ This version brings features allowing more complex interactions with web pages:
 - Configure the viewport
 - Set additional conditions to validate the loading of a page (ex: wait for selector)
 - Inject HTML/CSS/JS
-- Allow sequences of actions within a single execution while you keep the same session (navigate on multiple pages, take several screenshots...)
+- Allow sequences of actions by combining nodes on a single execution while you keep the same session (navigate on multiple pages, take several screenshots...)
+- Allow multiple output combination on a single node
 - Granular management of options (globally and on each sequence)
-
 
 ## How to install
 
@@ -87,103 +87,101 @@ Check out [this gist](https://gist.github.com/hckdotng/4232ceaaab6a3533aaca022cc
     * **Inject HTML**: Allows you to append HTML to the body.
     * **Inject CSS**: Allows you to append raw CSS to the head.
     * **Inject JS**: Allows you to append raw JS to the head.
-* **Steps**
-    * **URL**: URL to the requesting page. Required on the first step but if it's empty in the followinf steps, Puppeteer will stay on the same page. It can be useful to achieve complex operations.
-    * **Query Parameters**: The query parameter to send.
-    * **Options**: These options override any corresponding global options for the step
-        * **Timeout**: Allows you to specify tge maximum navigation time in milliseconds. You can pass 0 to disable the timeout entirely.
-        * **Wait Until**: Allows you to change how Puppeteer considers navigation completed.
-            * `load`: The load event is fired.
-            * `networkidle0`: No more than 0 connections for at least 500 ms.
-            * `networkidle2`: No more than 2 connections for at least 500 ms.
-        * **Time to Wait**: Allows you specify a time (ms) for Puppeteer to wait before any interactions and content output.
-        * **Wait for Selector**: Allows you specify Puppeteer to wait for a selector to appear in page before any interactions and content output.
-        * **Inject HTML**: Allows you to append HTML to the body.
-        * **Inject CSS**: Allows you to append raw CSS to the head.
-        * **Inject JS**: Allows you to append raw JS to the head.
-    * **Interactions**: Allows you to click on elements or fill fields, in order Puppeteer will wait for the element to display (timeout 10s) so you can easily chain multiple interactions even if there is asynchonous call.
-        * **Selector**: CSS selector to specify the element to interact with.
-        * **Value**: If specified, Puppeteer will try to type the value with the keyboard emulation, if not, Puppeteer will click on the element.
-        * **Wait for navigation**: Set it to true only if the click triggers a page change, so Puppeteer will wait before any other action.
-    * **Output**: Output is optional, but if you decide to output data in the current step, you can't select multiple data output even if the UI of n8n allows it. If you need multiple output just add another step without URL to stay on the same page.
-        * **Page content**: Returns raw HTML (string) or JSON depending on the options selected and the context.
-          * **CSS selector**: If empty it will returns the whole page (document), if not the specified element.
-          * **Select All**: Instead of grabbing the first element matching the CSS selector, all matching elements will be returned.
-          * **innerHTML**: In case of CSS selector (and HTML to JSON set to false), it will returns the raw innerHTML instead of the outerHTML.
-          * **HTML to JSON**: Try to convert HTML nodes to JSON with the following logic:
-                
-                <a href="/contact" class="mr-2 text-sm">Contact</a>
+* **Node options**: These options override any corresponding global options for the step
+    * **Timeout**: Allows you to specify tge maximum navigation time in milliseconds. You can pass 0 to disable the timeout entirely.
+    * **Wait Until**: Allows you to change how Puppeteer considers navigation completed.
+        * `load`: The load event is fired.
+        * `networkidle0`: No more than 0 connections for at least 500 ms.
+        * `networkidle2`: No more than 2 connections for at least 500 ms.
+    * **Time to Wait**: Allows you specify a time (ms) for Puppeteer to wait before any interactions and content output.
+    * **Wait for Selector**: Allows you specify Puppeteer to wait for a selector to appear in page before any interactions and content output.
+    * **Inject HTML**: Allows you to append HTML to the body.
+    * **Inject CSS**: Allows you to append raw CSS to the head.
+    * **Inject JS**: Allows you to append raw JS to the head.
+* **URL**: URL to the requesting page. Required on the first node but if it's empty in a following node, Puppeteer will stay on the same page. It can be useful to achieve complex operations.
+* **Query Parameters**: The query parameter to send.
+* **Interactions**: Allows you to click on elements or fill fields, in order Puppeteer will wait for the element to display (timeout 10s) so you can easily chain multiple interactions even if there is asynchonous call.
+    * **Selector**: CSS selector to specify the element to interact with.
+    * **Value**: If specified, Puppeteer will try to type the value with the keyboard emulation, if not, Puppeteer will click on the element.
+    * **Wait for navigation**: Set it to true only if the click triggers a page change, so Puppeteer will wait before any other action.
+* **Output**: Output is optional, but if you decide to output data in the current step, you can't select multiple data output even if the UI of n8n allows it. If you need multiple output just add another step without URL to stay on the same page.
+    * **Page content**: Returns raw HTML (string) or JSON depending on the options selected and the context.
+      * **Property name**: Name of the property returned for this output.
+      * **CSS selector**: If empty it will returns the whole page (document), if not the specified element.
+      * **Select All**: Instead of grabbing the first element matching the CSS selector, all matching elements will be returned.
+      * **innerHTML**: In case of CSS selector (and HTML to JSON set to false), it will returns the raw innerHTML instead of the outerHTML.
+      * **HTML to JSON**: Try to convert HTML nodes to JSON with the following logic:
+            
+            <a href="/contact" class="mr-2 text-sm">Contact</a>
 
-                "a": {
-                    "@href": "/contact",
-                    "@class": [
-                        "mr-2",
-                        "text-sm"
-                    ],
-                    "#text": "Contact"
-                }
+            "a": {
+                "@href": "/contact",
+                "@class": [
+                    "mr-2",
+                    "text-sm"
+                ],
+                "#text": "Contact"
+            }
 
-                <div>
-                    <div class="bg-red-500">
-                        <p>Hello</p>
-                        <p class="text-xl">Wo<b>r</b>ld!</p>
-                    </div>
+            <div>
+                <div class="bg-red-500">
+                    <p>Hello</p>
+                    <p class="text-xl">Wo<b>r</b>ld!</p>
                 </div>
+            </div>
 
+            "div": {
                 "div": {
-                    "div": {
-                        "@class": "bg-red-500",
-                        "p": [
-                            "Hello",
-                            {
-                                "@class": "text-xl",
-                                "#text": [
-                                    "Wo",
-                                    "ld!"
-                                ],
-                                "b": "r"
-                            }
-                        ]
-                    }
+                    "@class": "bg-red-500",
+                    "p": [
+                        "Hello",
+                        {
+                            "@class": "text-xl",
+                            "#text": [
+                                "Wo",
+                                "ld!"
+                            ],
+                            "b": "r"
+                        }
+                    ]
                 }
+            }
 
-          * **No attributes**: Ignore HTML attributes while converting to JSON.
-  
-        * **Screenshot**: Returns binary.
-            * **CSS selector**: If empty it captures the whole window or page depending on the options, if not it captures the corresponding zone.
-            * **Property Name**: Name of the binary property returned.
-            * **Type**: Image type to use between JPG, PNG and WebP.
-            * **Quality**: The quality of the image, between 0-100. Not applicable to PNG.
-            * **Full Page**: Allows you to capture a screen of the full scrollable content.
-        * **PDF**: Returns binary.
-            * **Property Name**: Name of the binary property returned.
-            * **Page Ranges**: Allows you to specify paper ranges to print, e.g. 1-5, 8, 11-13.
-            * **Scale**: Allows you to scale the rendering of the web page. Amount must be between 0.1 and 2
-            * **Prefer CSS Page Size**: Give any CSS @page size declared in the page priority over what is declared in the width or height or format option.
-            * **Format**: Allows you to specify the paper format types when printing a PDF. eg: Letter, A4.
-            * **Height**: Allows you to set the height of paper. You can pass in a number or a string with a unit.
-            * **Width**: Allows you to set the width of paper. You can pass in a number or a string with a unit.
-            * **Landscape**: Allows you to control whether to show the header and footer
-            * **Margin**: Allows you to specify top, left, right, and bottom margin.
-            * **Display Header/Footer**: Allows you to specify whether to show the header and footer.
-            * **Header Template**: Allows you to specify the HTML template for the print header. Should be valid HTML with the following classes used to inject values into them:
-                - `date`: Formatted print date
-                - `title`: Document title
-                - `url`: Document location
-                - `pageNumber` Current page number
-                - `totalPages` Total pages in the document
-             * **Footer Template**: Allows you to specify the HTML template for the print footer. Should be valid HTML with the following classes used to inject values into them:
-                - `date`: Formatted print date
-                - `title`: Document title
-                - `url`: Document location
-                - `pageNumber` Current page number
-                - `totalPages` Total pages in the document
-            * **Transparent Background**: Allows you to hide the default white background and allows generate PDFs with transparency.
-            * **Background Graphic**: Allows you to include background graphics.
+      * **No attributes**: Ignore HTML attributes while converting to JSON.
 
-## Screenshots
+    * **Screenshot**: Returns binary.
+        * **CSS selector**: If empty it captures the whole window or page depending on the options, if not it captures the corresponding zone.
+        * **Property Name**: Name of the binary property returned.
+        * **Type**: Image type to use between JPG, PNG and WebP.
+        * **Quality**: The quality of the image, between 0-100. Not applicable to PNG.
+        * **Full Page**: Allows you to capture a screen of the full scrollable content.
+    * **PDF**: Returns binary.
+        * **Property Name**: Name of the binary property returned.
+        * **Page Ranges**: Allows you to specify paper ranges to print, e.g. 1-5, 8, 11-13.
+        * **Scale**: Allows you to scale the rendering of the web page. Amount must be between 0.1 and 2
+        * **Prefer CSS Page Size**: Give any CSS @page size declared in the page priority over what is declared in the width or height or format option.
+        * **Format**: Allows you to specify the paper format types when printing a PDF. eg: Letter, A4.
+        * **Height**: Allows you to set the height of paper. You can pass in a number or a string with a unit.
+        * **Width**: Allows you to set the width of paper. You can pass in a number or a string with a unit.
+        * **Landscape**: Allows you to control whether to show the header and footer
+        * **Margin**: Allows you to specify top, left, right, and bottom margin.
+        * **Display Header/Footer**: Allows you to specify whether to show the header and footer.
+        * **Header Template**: Allows you to specify the HTML template for the print header. Should be valid HTML with the following classes used to inject values into them:
+            - `date`: Formatted print date
+            - `title`: Document title
+            - `url`: Document location
+            - `pageNumber` Current page number
+            - `totalPages` Total pages in the document
+         * **Footer Template**: Allows you to specify the HTML template for the print footer. Should be valid HTML with the following classes used to inject values into them:
+            - `date`: Formatted print date
+            - `title`: Document title
+            - `url`: Document location
+            - `pageNumber` Current page number
+            - `totalPages` Total pages in the document
+        * **Transparent Background**: Allows you to hide the default white background and allows generate PDFs with transparency.
+        * **Background Graphic**: Allows you to include background graphics.
 
-![](images/content.png)
+## Screenshot
 
 ![](images/screenshot.png)
 

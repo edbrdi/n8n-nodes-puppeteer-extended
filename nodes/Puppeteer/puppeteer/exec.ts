@@ -5,22 +5,22 @@ import {
 	HTTPResponse,
 	ScreenshotOptions,
 	PDFOptions,
+	PaperFormat,
 } from "puppeteer";
 import { IDataObject, IBinaryData } from "n8n-workflow";
 import state from "./state";
 import { INodeParameters } from "./helpers";
 
-async function pageContent(
-	getPageContent: {
-		dataPropertyName: string;
-		cssSelector: string;
-		htmlToJson: boolean;
-		innerHtml: boolean;
-		selectAll: boolean;
-		noAttributes: boolean;
-	},
-	page: Page
-) {
+interface IPageContent {
+	dataPropertyName: string;
+	cssSelector: string;
+	htmlToJson: boolean;
+	innerHtml: boolean;
+	selectAll: boolean;
+	noAttributes: boolean;
+}
+
+async function pageContent(getPageContent: IPageContent, page: Page) {
 	const {
 		dataPropertyName,
 		cssSelector,
@@ -80,6 +80,9 @@ async function pageContent(
 										else value[nodeName] = [value[nodeName], childNode];
 									}
 								}
+
+								if (value && typeof value === "object")
+									delete value["#comment"];
 
 								return {
 									...attributes,
@@ -145,10 +148,16 @@ async function pageContent(
 							);
 						}
 
-						const parsed: any[] = [];
+						let parsed: any[] = [];
 						selection.forEach((e) => {
-							const current = htmlToJson(e);
+							let current = htmlToJson(e);
 							recursiveHtmlToJson(current);
+							if (current && typeof current === "object") {
+								delete current["#comment"];
+								if (Object.keys(current).length === 1 && current["#text"]) {
+									current = current["#text"];
+								}
+							}
 							parsed.push(current);
 						});
 
@@ -191,7 +200,15 @@ async function pageContent(
 	});
 }
 
-async function pageScreenshot(options: any, page: Page) {
+interface IPageScreenshot {
+	imageType: ScreenshotOptions["type"];
+	fullPage: true;
+	cssSelector: string;
+	quality: number;
+	dataPropertyName: string;
+}
+
+async function pageScreenshot(options: IPageScreenshot, page: Page) {
 	const type = options.imageType;
 	const fullPage = options.fullPage;
 	const cssSelector = options.cssSelector;
@@ -224,7 +241,24 @@ async function pageScreenshot(options: any, page: Page) {
 	return {};
 }
 
-async function pagePDF(options: any, page: Page) {
+interface IPagePdf {
+	dataPropertyName: string;
+	pageRanges: string;
+	displayHeaderFooter: boolean;
+	omitBackground: boolean;
+	printBackground: boolean;
+	landscape: boolean;
+	scale: number;
+	width: number;
+	height: number;
+	margin: { top: string; right: string; bottom: string; left: string };
+	preferCSSPageSize: boolean;
+	headerTemplate: string;
+	footerTemplate: string;
+	format: PaperFormat;
+}
+
+async function pagePDF(options: IPagePdf, page: Page): Promise<any> {
 	const dataPropertyName = options.dataPropertyName;
 	const pageRanges = options.pageRanges;
 	const displayHeaderFooter = options.displayHeaderFooter;
@@ -509,7 +543,7 @@ export default async function (
 		const getAllPageContent = async () => {
 			const allPageContent: any[] = [];
 
-			nodeParameters.output.getPageContent.forEach((options: any) => {
+			nodeParameters.output.getPageContent.forEach((options: IPageContent) => {
 				allPageContent.push(pageContent(options, page));
 			});
 
@@ -533,9 +567,11 @@ export default async function (
 			if (nodeParameters.output.getScreenshot) {
 				const allScreenshot: any[] = [];
 
-				nodeParameters.output.getScreenshot.forEach(async (options: any) => {
-					allScreenshot.push(pageScreenshot(options, page));
-				});
+				nodeParameters.output.getScreenshot.forEach(
+					async (options: IPageScreenshot) => {
+						allScreenshot.push(pageScreenshot(options, page));
+					}
+				);
 
 				const resolvedAllPageScreenshot = await Promise.all(
 					allScreenshot
